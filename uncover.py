@@ -1,22 +1,61 @@
 from scapy.all import *
 import threading
+import hexdump
+import Queue
 import os
 
-ap_list = []
-unknown_ap = []
 
-
-class Sniff_Thread (threading.Thread):
-    def __init__(self, iface, t):
-        threading.Thread.__init__(self)
+class SniffThread (threading.Thread):
+    def __init__(self, iface, queue):
+        self._stop_event = threading.Event()
         self.iface = iface
-        self.thread = t
+        self.queue = queue
+        self.ap_list = {}
+        self.unknown_ap = []
+        self.uncovered_ap = {}
+        self.list = {}
+        thread = threading.Thread(target=self.run, args=())
+        thread.daemon = True
+        thread.start()
+
+    def uncover_ap(self, pkt):
+        try:
+            if pkt.type == 0:  # and pkt.subtype == 4 and pkt.addr2 in unknown_ap and pkt.addr2 not in ap_list:
+                if pkt.subtype == 8:
+                    if hexdump.dump(pkt.info) == "00 00 00 00 00 00 00 00" or pkt.info == "" or pkt.info == "Broadcast":
+                        if pkt.addr2 not in self.unknown_ap:
+                            self.unknown_ap.append(pkt.addr2)
+                            with open("unknown.txt", "a") as k:
+                                k.write("MAC: " + pkt.addr2 + " ESSID: " + pkt.info + "\n")
+
+                    elif hexdump.dump(pkt.info) != "00 00 00 00 00 00 00 00" or pkt.info != "" or pkt.info != "Broadcast":
+                        if pkt.addr2 not in self.ap_list.keys():
+                            self.ap_list[pkt.addr2] = pkt.info
+                            with open("known.txt", "a") as k:
+                                k.write("MAC: " + pkt.addr2 + " ESSID: " + pkt.info + "\n")
+
+                elif pkt.subtype == 5:
+                    if pkt.addr2 not in self.uncovered_ap.keys() and pkt.addr2 in self.unknown_ap:
+                        print "MAC: " + pkt.addr2 + " ESSID: " + pkt.info
+                        with open("uncovered.txt", "a") as k:
+                            k.write("MAC: " + pkt.addr2 + " ESSID: " + pkt.info + "\n")
+                        self.uncovered_ap[pkt.addr2] = pkt.info
+
+            self.list['kap'] = self.ap_list
+            self.list['ucap'] = self.uncovered_ap
+            self.queue.put(self.list)
+
+        except AttributeError:
+            pass
+
+        except KeyboardInterrupt:
+            self._stop_event.set()
 
     def run(self):
-        if self.thread == 1:
-            sniff(iface=self.iface, prn=list_hidden_ap)
-        elif self.thread == 2:
-            sniff(iface=self.iface, prn=uncover_ap)
+        sniff(iface=self.iface, prn=self.uncover_ap)
+
+    def stop(self):
+        self._stop_event.set()
 
 
 def get_iface():
@@ -68,22 +107,33 @@ def clean_up(iface):
     exit()
 
 
-def uncover_ap(pkt):
+def main():
+    interface = get_iface()
+    monitor_mode(interface)
+    queue = Queue.Queue()
+    thread = SniffThread(interface, queue)
+
     try:
-        if pkt.info == "":
-            unknown_ap.append(pkt.addr2)
-    except:
-        pass
+        while 1:
+            ch = raw_input("\n[1] Print list of known APs\n[2] Print list of uncovered APs\n[3] Clear Screen\nEnter Choice: ")
+            if ch == "1":
+                ap_list = queue.get()
+                print "\n============== LIST OF KNOWN APs =============="
+                for addr in ap_list['kap'].keys():
+                    print "MAC: " + addr + " ESSID: " + ap_list['kap'][addr]
+            elif ch == "2":
+                ap_list = queue.get()
+                print "\n============== LIST OF UNCOVERED APs =============="
+                for addr in ap_list['ucap'].keys():
+                    print "MAC: " + addr + " ESSID: " + ap_list['ucap'][addr]
+            elif ch == "3":
+                os.system("clear")
+            else:
+                print "[!] Invalid option try again"
+    except KeyboardInterrupt:
+        thread.stop()
+        clean_up(interface)
 
-    if pkt.type == 0 and pkt.subtype == 4 and pkt.addr2 in unknown_ap and pkt.addr2 not in ap_list:
-        if pkt.info != "":
-            print pkt.addr2 + " > " + pkt.addr3 + " : Subtype 4 : " + pkt.info
-            ap_list.append(pkt.addr2)
 
-
-
-iface = get_iface()
-monitor_mode(iface)
-sniff(iface=iface, prn=uncover_ap)
-
-clean_up(iface)
+if __name__ == "__main__":
+    main()
