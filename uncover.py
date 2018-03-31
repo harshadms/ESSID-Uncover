@@ -140,4 +140,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    uid = os.getuid()
+    if uid != 0:
+        print "No mortals are allowed. Please switch to god-mode (sudo) :)"
+        exit()
+    else:
+        main()
