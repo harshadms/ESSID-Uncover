@@ -1,3 +1,4 @@
+from datetime import datetime
 from scapy.all import *
 import threading
 import hexdump
@@ -7,7 +8,6 @@ import os
 
 class SniffThread (threading.Thread):
     def __init__(self, iface, queue):
-        self._stop_event = threading.Event()
         self.iface = iface
         self.queue = queue
         self.ap_list = {}
@@ -18,17 +18,31 @@ class SniffThread (threading.Thread):
         thread.daemon = True
         thread.start()
 
+        with open("unknown.txt", "a") as k:
+            k.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "\n")
+
+        with open("known.txt", "a") as k:
+            k.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "\n")
+
+        with open("uncovered.txt", "a") as k:
+            k.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "\n")
+
+        try:
+            thread.join()
+        except KeyboardInterrupt:
+            print "HELLO"
+
     def uncover_ap(self, pkt):
         try:
             if pkt.type == 0:  # and pkt.subtype == 4 and pkt.addr2 in unknown_ap and pkt.addr2 not in ap_list:
                 if pkt.subtype == 8:
-                    if pkt.info is None:
+                    if self.is_null(pkt.info):
                         if pkt.addr2 not in self.unknown_ap:
                             self.unknown_ap.append(pkt.addr2)
                             with open("unknown.txt", "a") as k:
                                 k.write("MAC: " + pkt.addr2 + "\n")
 
-                    elif pkt.info is not None:
+                    elif not self.is_null(pkt.info):
                         if pkt.addr2 not in self.ap_list.keys():
                             self.ap_list[pkt.addr2] = pkt.info
                             with open("known.txt", "a") as k:
@@ -50,6 +64,12 @@ class SniffThread (threading.Thread):
 
         except KeyboardInterrupt:
             self._stop_event.set()
+
+    def is_null(self, ssid):
+        if not ssid or hexdump.dump(ssid) == "00 00 00 00 00 00 00" or ssid is None or ssid == "":
+            return True
+        else:
+            return False
 
     def run(self):
         sniff(iface=self.iface, prn=self.uncover_ap)
@@ -112,9 +132,9 @@ def main():
     monitor_mode(interface)
     queue = Queue.Queue()
     thread = SniffThread(interface, queue)
-
     try:
-        while 1:
+        pass
+        '''while 1:
             ch = raw_input("\n[1] Print list of known APs\n[2] Print list of uncovered APs\n[3] Clear Screen\nEnter Choice: ")
             if ch == "1":
                 ap_list = queue.get()
@@ -123,13 +143,13 @@ def main():
                     print "MAC: " + addr + " ESSID: " + ap_list['kap'][addr]
             elif ch == "2":
                 ap_list = queue.get()
-                print "\n============== LIST OF UNCOVERED APs =============="
+                print "\n============== LIST OF UNCOVERED APs =============="   
                 for addr in ap_list['ucap'].keys():
                     print "MAC: " + addr + " ESSID: " + ap_list['ucap'][addr]
             elif ch == "3":
                 os.system("clear")
             else:
-                print "[!] Invalid option try again"
+                print "[!] Invalid option try again"'''
     except KeyboardInterrupt:
         thread.stop()
         clean_up(interface)
