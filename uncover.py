@@ -134,22 +134,6 @@ def main():
     thread = SniffThread(interface, queue)
     try:
         pass
-        '''while 1:
-            ch = raw_input("\n[1] Print list of known APs\n[2] Print list of uncovered APs\n[3] Clear Screen\nEnter Choice: ")
-            if ch == "1":
-                ap_list = queue.get()
-                print "\n============== LIST OF KNOWN APs =============="
-                for addr in ap_list['kap'].keys():
-                    print "MAC: " + addr + " ESSID: " + ap_list['kap'][addr]
-            elif ch == "2":
-                ap_list = queue.get()
-                print "\n============== LIST OF UNCOVERED APs =============="   
-                for addr in ap_list['ucap'].keys():
-                    print "MAC: " + addr + " ESSID: " + ap_list['ucap'][addr]
-            elif ch == "3":
-                os.system("clear")
-            else:
-                print "[!] Invalid option try again"'''
     except KeyboardInterrupt:
         thread.stop()
         clean_up(interface)
