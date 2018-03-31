@@ -22,10 +22,11 @@ class SniffThread (threading.Thread):
         try:
             if pkt.type == 0:  # and pkt.subtype == 4 and pkt.addr2 in unknown_ap and pkt.addr2 not in ap_list:
                 if pkt.subtype == 8:
-                    if pkt.addr2 not in self.unknown_ap:
+                    if pkt.info is None:
+                        if pkt.addr2 not in self.unknown_ap:
                             self.unknown_ap.append(pkt.addr2)
                             with open("unknown.txt", "a") as k:
-                                k.write("MAC: " + pkt.addr2 + " ESSID: " + pkt.info + "\n")
+                                k.write("MAC: " + pkt.addr2 + "\n")
 
                     elif pkt.info is not None:
                         if pkt.addr2 not in self.ap_list.keys():
